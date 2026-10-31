@@ -1,0 +1,31 @@
+name: Keep LifeGuide awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-lifeguide-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Ping life-guide.in
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 90 https://life-guide.in/ || true)
+            echo "life-guide.in attempt $i: HTTP ${code:-none}"
+            [ "$code" = "200" ] && break
+            sleep 15
+          done
+      - name: Ping lifeguide-zkj3.onrender.com
+        run: |
+          code=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 90 https://lifeguide-zkj3.onrender.com/ || true)
+          echo "lifeguide-zkj3.onrender.com: HTTP ${code:-none}"
