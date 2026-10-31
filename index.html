@@ -195,7 +195,7 @@ function sigTable(snap){const all=snap.companies, f=sigState.filter;
     +`<p class="lm-foot" id="sig-footnote">Buy/Sell = Lakshmi Mata Up/Down markers on the daily chart; a prompt to review, not an automatic trade. Trading days ago = NSE sessions after the marker bar up to ${esc(fmtDate(asOf))}${all.some(c=>c.lm&&c.lm.approx)?' (≈ = marker date read ±1 bar)':'; all marker dates confirmed by hovering'}. "⚠ Review to sell" = Down within 10 trading days.</p>`;}
 function bindSig(snap){const w=document.getElementById('sig-wrap');if(!w)return;
   w.querySelectorAll('th[data-col]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.col;
-    sigState.dir=sigState.col===k?-sigState.dir:(k==='date'||k==='days'?(k==='date'?-1:1):(k==='stock'||k==='stage'||k==='signal'||k==='action'?1:-1));sigState.col=k;w.innerHTML=sigTable(snap);bindSig(snap);}));
+    sigState.dir=sigState.col===k?-sigState.dir:-1;  /* first click descending, then flip */sigState.col=k;w.innerHTML=sigTable(snap);bindSig(snap);}));
   w.querySelectorAll('.sig-f').forEach(b=>b.addEventListener('click',()=>{sigState.filter=b.dataset.f;w.innerHTML=sigTable(snap);bindSig(snap);}));}
 function lmFootText(snap){const cos=snap.companies, ap=cos.filter(c=>c.lm&&c.lm.approx&&c.lm.range), none=cos.filter(c=>c.lm&&!c.lm.signal).map(c=>c.short), found=cos.filter(c=>c.lm&&c.lm.found);
   const asOf=(cos.find(c=>c.lm&&c.lm.asOf)||{lm:{asOf:snap.priceAsOf}}).lm.asOf;
@@ -514,7 +514,7 @@ function peadRender(){const w=document.getElementById('pead-root');if(!w||!PEAD.
    +`<p class="lm-foot">Sources: ${esc(PEAD.sources.join('; '))}. Information only; not a buy/sell recommendation.</p></section>`;
   peadCharts.forEach(c=>c.destroy());peadCharts=[];
   w.querySelectorAll('#pead-table th[data-col]').forEach(th=>th.addEventListener('click',()=>{const c=th.dataset.col,y=window.scrollY;
-    peadState.dir=peadState.col===c?-peadState.dir:(c==='company'||c==='status'?1:-1);peadState.col=c;peadRender();window.scrollTo(0,y);}));
+    peadState.dir=peadState.col===c?-peadState.dir:-1;peadState.col=c;peadRender();window.scrollTo(0,y);}));
   if(typeof Chart!=='undefined') selK.forEach((k,i)=>{const s=A[k].series,el=document.getElementById('pead-ch-'+i);if(!s||!el)return;
     peadCharts.push(new Chart(el,{type:'line',data:{labels:s.map(p=>fmtDate(p[0])),datasets:[{label:'Close',data:s.map(p=>p[1]),borderColor:C.close,borderWidth:1.5,pointRadius:0},{label:'50 DMA',data:s.map(p=>p[2]),borderColor:C.s50,borderWidth:1.6,pointRadius:0},{label:'200 DMA',data:s.map(p=>p[3]),borderColor:C.s200,borderWidth:1.6,pointRadius:0}]},options:{...base,animation:false,interaction:{mode:'index',intersect:false},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6,font:{size:10}}},y:{grid:{color:C.grid}}}}}));});
 }
@@ -534,6 +534,109 @@ if(location.hash==='#results') document.querySelector('.tab[data-tab="results"]'
 if(location.hash==='#volume') document.querySelector('.tab[data-tab="volume"]').click();
 })();
 </script>
-<footer class="pub-foot">Updated 31 Oct 2026, 9:35 PM IST. For information only, not investment advice.</footer>
+<script>/* Generic header-click table sorter (one function for every table). First click on a column = descending (▼), next click = ascending (▲),
+   then it keeps flipping. Numbers (commas, %, ₹, ×, + stripped), dates ('30 Oct 2026', '28 Oct'), and text (case-insensitive) are
+   detected per column; n/a, blank and dashes always go last. Ties keep the original (default) order, which stays until a header is clicked.
+   A row whose cell has rowspan>1 keeps its covered rows with it; rows with class "tsort-child" stay under the row above them.
+   Total rows (class ztot, total or tsort-fixed) stay pinned at the bottom.
+   Tables with their own sorter (headers with data-col), tables without a header row, and tables marked data-nosort are left alone. */
+(function(){
+  const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const NA=/^(n\/?a|na|none|nil|[-–—−]+|\.{0,3})$/i;
+  const DSTART=/^[~≈]?\s*(?:by\s+|on\s+|from\s+)?(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:\s+'?(\d{2,4}))?/i;
+  const DANY=/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{4})\b/i;
+  const NUM=/^[+\-−]?\d*\.?\d+(?:e[+\-]?\d+)?/i;
+  const yr=new Date().getFullYear();
+  const mkDate=m=>{let y=m[3]?+m[3]:yr; if(y<100)y+=2000; return Date.UTC(y,MON[m[2].toLowerCase().slice(0,3)],+m[1]);};
+  function parse(t){
+    t=(t||'').replace(/\s+/g,' ').trim();
+    if(NA.test(t)) return {k:'na'};
+    let m=t.match(DSTART); if(m) return {k:'date',v:mkDate(m),s:t.toLowerCase()};
+    const c=t.replace(/^[₹$]|(?<=^[+\-−])[₹$]/,'').replace(/[,₹\s]/g,'').replace(/^−/,'-').replace(/^\+/,'');
+    m=c.match(NUM); if(m) return {k:'num',v:parseFloat(m[0]),s:t.toLowerCase()};
+    m=t.match(DANY); if(m) return {k:'date',v:mkDate(m),s:t.toLowerCase(),weak:1};
+    return {k:'text',s:t.toLowerCase()};
+  }
+  function headerRow(tb){
+    if(tb.tHead&&tb.tHead.rows.length) return tb.tHead.rows[tb.tHead.rows.length-1];
+    const r=tb.rows[0]; if(!r||!r.cells.length) return null;
+    return Array.from(r.cells).every(c=>c.tagName==='TH')?r:null;
+  }
+  const PIN=r=>/\b(ztot|total|tsort-fixed)\b/.test(r.className);
+  function groups(tb,hr){
+    const body=Array.from(tb.rows).filter(r=>r!==hr&&!PIN(r)&&!(tb.tHead&&tb.tHead.contains(r))&&!(tb.tFoot&&tb.tFoot.contains(r)));
+    const g=[];let cover=0;
+    body.forEach(r=>{
+      if(cover>0||r.classList.contains('tsort-child')){ if(g.length){g[g.length-1].rows.push(r);cover=Math.max(0,cover-1);return;} }
+      const span=Math.max(1,...Array.from(r.cells).map(c=>c.rowSpan||1));
+      g.push({rows:[r]}); cover=span-1;
+    });
+    return g;
+  }
+  function colIndex(hr,th){let i=0;for(const c of hr.cells){if(c===th)return i;i+=c.colSpan||1;}return -1;}
+  function cellAt(r,ci){let i=0;for(const c of r.cells){const n=c.colSpan||1;if(ci>=i&&ci<i+n)return c;i+=n;}return null;}
+  function sortBy(tb,th){
+    const hr=headerRow(tb); if(!hr) return;
+    const ci=colIndex(hr,th); if(ci<0) return;
+    const G=groups(tb,hr); if(G.length<2) return;
+    if(!tb.dataset.tsInit){G.forEach((g,i)=>g.rows[0].dataset.tsOrd=i);tb.dataset.tsInit='1';}
+    const prev=tb.dataset.tsCol, dir=(prev===String(ci)&&tb.dataset.tsDir==='-1')?1:-1;
+    tb.dataset.tsCol=ci; tb.dataset.tsDir=dir;
+    const P=G.map(g=>{const c=cellAt(g.rows[0],ci);const s=c?(c.dataset.sort!=null?c.dataset.sort:c.textContent):'';return {g,p:parse(s),o:+g.rows[0].dataset.tsOrd};});
+    const cnt={num:0,date:0,text:0};P.forEach(x=>{if(x.p.k!=='na')cnt[x.p.k]++;});
+    const tot=cnt.num+cnt.date+cnt.text;
+    const kind=tot&&cnt.date>=0.6*tot?'date':tot&&cnt.num>=0.6*tot?'num':'text';
+    const key=x=>{const p=x.p;if(p.k==='na')return null;if(kind==='text')return p.s;if(p.k===kind)return p.v;return null;};
+    P.forEach(x=>x.key=key(x));
+    P.sort((a,b)=>{const A=a.key,B=b.key;
+      if(A===null&&B===null)return a.o-b.o; if(A===null)return 1; if(B===null)return -1;
+      const r=kind==='text'?A.localeCompare(B,undefined,{numeric:true,sensitivity:'base'}):A-B;
+      return r?dir*r:a.o-b.o;});
+    const parent=G[0].rows[0].parentNode;
+    P.forEach(x=>x.g.rows.forEach(r=>parent.appendChild(r)));
+    Array.from(parent.rows||[]).filter(PIN).forEach(r=>parent.appendChild(r));
+    hr.querySelectorAll('.tsort-arr').forEach(e=>e.remove());
+    Array.from(hr.cells).forEach(c=>c.setAttribute('aria-sort','none'));
+    th.setAttribute('aria-sort',dir<0?'descending':'ascending');
+    const s=document.createElement('span');s.className='tsort-arr arr';s.textContent=dir<0?'▼':'▲';th.appendChild(s);
+  }
+  function reset(tb){  // back to the default order (used by the tests)
+    const hr=headerRow(tb); if(!hr||!tb.dataset.tsInit) return;
+    const G=groups(tb,hr); const parent=G.length?G[0].rows[0].parentNode:null;
+    G.sort((x,y)=>(+x.rows[0].dataset.tsOrd)-(+y.rows[0].dataset.tsOrd)).forEach(g=>g.rows.forEach(r=>parent.appendChild(r)));
+    if(parent) Array.from(parent.rows||[]).filter(PIN).forEach(r=>parent.appendChild(r));
+    hr.querySelectorAll('.tsort-arr').forEach(e=>e.remove()); Array.from(hr.cells).forEach(c=>c.removeAttribute('aria-sort'));
+    delete tb.dataset.tsCol; delete tb.dataset.tsDir;
+  }
+  function eligible(tb){
+    if(!tb||tb.dataset.nosort!=null||tb.querySelector('th[data-col]')) return null;
+    return headerRow(tb);
+  }
+  function mark(root){
+    (root||document).querySelectorAll('table').forEach(tb=>{
+      if(tb.dataset.tsMarked) return; const hr=eligible(tb); if(!hr) return;
+      tb.dataset.tsMarked='1'; tb.classList.add('tsort');
+      Array.from(hr.cells).forEach(c=>{if(!c.title)c.title='Click to sort (first click: descending, again: ascending)';});
+    });
+  }
+  document.addEventListener('click',e=>{
+    const th=e.target.closest&&e.target.closest('th'); if(!th) return;
+    const tb=th.closest('table'); const hr=eligible(tb); if(!hr||th.parentNode!==hr) return;
+    if(e.target.closest('a,button,input,select')) return;
+    sortBy(tb,th);
+  });
+  const st=document.createElement('style');
+  st.textContent='table.tsort>thead>tr:last-child>th,table.tsort>tbody>tr:first-child>th,table.tsort>tr:first-child>th{cursor:pointer;user-select:none;}'
+   +'table.tsort th:hover{text-decoration:underline dotted;}'
+   +'.tsort-arr{margin-left:3px;color:var(--accent,#5b9cff);text-decoration:none;}';
+  (document.head||document.documentElement).appendChild(st);
+  const run=()=>mark(document);
+  let q=0; const mo=new MutationObserver(()=>{if(!q){q=1;requestAnimationFrame(()=>{q=0;run();});}});
+  const go=()=>{run();mo.observe(document.body,{childList:true,subtree:true});};
+  if(document.body) go(); else document.addEventListener('DOMContentLoaded',go);
+  window.tableSort={sortBy,parse,mark,reset};
+})();
+</script>
+<footer class="pub-foot">Updated 31 Oct 2026, 11:01 PM IST. For information only, not investment advice.</footer>
 </body>
 </html>
