@@ -509,10 +509,10 @@ function peadRender(){const w=document.getElementById('pead-root');if(!w||!PEAD.
    +`<p class="section-desc">Post-earnings drift for the ${PEAD.screen.count} companies in <a href="${esc(PEAD.screen.url)}" target="_blank" rel="noopener">${esc(PEAD.screen.name)}</a> (screen exported ${esc(PEAD.screen.exported||'')}). Prices as of ${esc(PEAD.asOfLabel)}. ${nSel} selected, ${nRej} rejected${pendK.length?`, ${pendK.length} pending (no session after the result yet; moves n/a)`:''}. Information only; not a buy/sell recommendation.</p>`
    +panel(`<p class="mv-rule"><b>Moves.</b> ${esc(PEAD.rules.moves)}</p><p class="mv-rule"><b>Volume check.</b> ${esc(PEAD.rules.volume)}</p><p class="mv-rule"><b>Circuit check.</b> ${esc(PEAD.rules.circuit)}</p><p class="mv-rule"><b>Trend.</b> ${esc(PEAD.rules.trend)}</p>`)
    +`<div class="sub-sec"><h3>Summary</h3><p class="cap" id="pead-sort-cap">All ${keys.length} companies sorted by <b>${esc(sortLbl)}</b> (${peadState.dir<0?'descending':'ascending'}; n/a last). Click any column header to sort; click again to reverse. Default: result date, newest first. The rejection list and the selected-stock sections below follow the same order. Days since = trading sessions / calendar days from the result date.</p>${panel(`<table id="pead-table"><thead><tr>${PEAD_COLS.map(([c,l])=>`<th class="sortable" data-col="${c}" aria-sort="${peadState.col===c?(peadState.dir<0?'descending':'ascending'):'none'}" title="Click to sort">${esc(l)}${peadState.col===c?`<span class="arr">${peadState.dir<0?'▼':'▲'}</span>`:''}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr data-key="${esc(r[0])}">${r.slice(1).map(v=>`<td>${cell(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`)}</div>`
-   +`<div class="sub-sec"><h3>Rejection list (${nRej})</h3><div class="callout alert"><ul id="pead-rejected">${rej}</ul></div></div>`
    +(pendK.length?`<div class="sub-sec"><h3>Pending — moves n/a (${pendK.length})</h3><div class="callout"><ul id="pead-pending">${pend}</ul></div></div>`:'')
    +`<div class="sub-sec"><h3>TradingView check</h3><div class="callout"><b>Lakshmi Mata pending for:</b> ${esc(PEAD.tvCheck.join(', '))}</div></div>`
    +`<div class="sub-sec"><h3>Selected stocks (${nSel})</h3><p class="cap">${PEAD.full.length>=nSel?'Full analysis for all selected stocks.':'Full analysis for the top '+PEAD.full.length+' by % since result with good volume; compact rows for the rest.'} Shown in the summary's sort order.</p>${selK.map(card).join('')}</div>`
+   +`<div class="sub-sec"><h3>Rejection list (${nRej})</h3><div class="callout alert"><ul id="pead-rejected">${rej}</ul></div></div>`
    +`<p class="lm-foot">Sources: ${esc(PEAD.sources.join('; '))}. Information only; not a buy/sell recommendation.</p></section>`;
   peadCharts.forEach(c=>c.destroy());peadCharts=[];
   w.querySelectorAll('#pead-table th[data-col]').forEach(th=>th.addEventListener('click',()=>{const c=th.dataset.col,y=window.scrollY;
@@ -639,6 +639,6 @@ if(location.hash==='#volume') document.querySelector('.tab[data-tab="volume"]').
   window.tableSort={sortBy,parse,mark,reset};
 })();
 </script>
-<footer class="pub-foot">Updated 15 Nov 2026, 5:10 PM IST. For information only, not investment advice.</footer>
+<footer class="pub-foot">Updated 15 Nov 2026, 6:25 PM IST. For information only, not investment advice.</footer>
 </body>
 </html>
